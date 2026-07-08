@@ -18,7 +18,7 @@ input[type=number]{-moz-appearance:textfield}
 <body>
 <div id="root"></div>
 <script type="text/babel">
-const {useState,useEffect}=React;
+const {useState,useEffect,useRef}=React;
 
 /* ---------- icons ---------- */
 const Svg=({className,children})=><svg className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">{children}</svg>;
@@ -191,14 +191,15 @@ const Seg=({value,onChange,options,th})=>
 
 /* ---------- app ---------- */
 function App(){
-  const [m,setM]=useState('all');
-  const [c,setC]=useState(false);
-  const [dm,setDm]=useState(true);
+  const [prefs]=useState(()=>load('fm_prefs',{}));
+  const [m,setM]=useState(prefs.m||'all');
+  const [c,setC]=useState(!!prefs.c);
+  const [dm,setDm]=useState(prefs.dm!==false);
   const [showSettings,setShowSettings]=useState(false);
-  const [showHs,setShowHs]=useState(false);
-  const [showRoster,setShowRoster]=useState(false);
-  const [showBreak,setShowBreak]=useState(false);
-  const [onlyDiff,setOnlyDiff]=useState(false);
+  const [showHs,setShowHs]=useState(!!prefs.showHs);
+  const [showRoster,setShowRoster]=useState(!!prefs.showRoster);
+  const [showBreak,setShowBreak]=useState(!!prefs.showBreak);
+  const [onlyDiff,setOnlyDiff]=useState(!!prefs.onlyDiff);
   const [vw,setVw]=useState(()=>typeof window!=='undefined'?window.innerWidth:1280);
 
   const [hs,setHs]=useState([]);
@@ -225,6 +226,12 @@ function App(){
   const [ocrEngine,setOcrEngine]=useState(()=>{try{return localStorage.getItem('fm_ocr_engine')||'gemini';}catch(e){return 'gemini';}});
   const [gkey,setGkey]=useState(()=>{try{return localStorage.getItem('fm_gemini_key')||'';}catch(e){return '';}});
 
+  const [rosterQ,setRosterQ]=useState('');
+  const [toast,setToast]=useState(null);
+  const toastRef=useRef(null);
+  const showToast=(msg,undo)=>{setToast({msg,undo});if(toastRef.current)clearTimeout(toastRef.current);toastRef.current=setTimeout(()=>setToast(null),6000);};
+  const doUndo=()=>{if(toast&&toast.undo)toast.undo();setToast(null);if(toastRef.current)clearTimeout(toastRef.current);};
+
   const saveGkey=(v)=>{setGkey(v);try{localStorage.setItem('fm_gemini_key',v);}catch(e){}};
   const chooseEngine=(v)=>{setOcrEngine(v);try{localStorage.setItem('fm_ocr_engine',v);}catch(e){}};
   const dismissTip=()=>{setSeenTip(true);try{localStorage.setItem('fm_seen_tip','1');}catch(e){}};
@@ -232,6 +239,7 @@ function App(){
   useEffect(()=>{setHs(load('fm_history',[]));},[]);
   useEffect(()=>{save('fm_history',hs);},[hs]);
   useEffect(()=>{save('fm_roster',roster);},[roster]);
+  useEffect(()=>{save('fm_prefs',{dm,m,c,onlyDiff,showBreak,showRoster,showHs});},[dm,m,c,onlyDiff,showBreak,showRoster,showHs]);
   useEffect(()=>{const on=()=>setVw(window.innerWidth);window.addEventListener('resize',on);return()=>window.removeEventListener('resize',on);},[]);
 
   const vis=m==='offensive'?OFF:m==='defensive'?DEFN:m==='goalkeeper'?GKL:Object.keys(attr);
@@ -255,14 +263,21 @@ function App(){
     if(e.p2data){setP2({...DEF,...e.p2data});setP2name(e.p2name||'');setC(true);}else setC(false);
     setM(e.m);
   };
-  const deleteOne=(idx)=>setHs(prev=>prev.filter((_,i)=>i!==idx));
+  const deleteOne=(idx)=>{const removed=hs[idx];setHs(prev=>prev.filter((_,i)=>i!==idx));showToast('Snapshot deleted',()=>setHs(prev=>{const n=[...prev];n.splice(idx,0,removed);return n;}));};
 
-  const resetAll=()=>{setP1(DEF);setP2(DEF);setP1name('');setP2name('');};
+  const resetAll=()=>{const snap={p1,p2,p1name,p2name};setP1(DEF);setP2(DEF);setP1name('');setP2name('');showToast('All players reset to 8',()=>{setP1(snap.p1);setP2(snap.p2);setP1name(snap.p1name);setP2name(snap.p2name);});};
   const resetSlot=(s)=>{if(s==='p2'){setP2(DEF);setP2name('');}else{setP1(DEF);setP1name('');}};
 
-  const savePlayer=(s)=>{const data=s==='p2'?p2:p1;const nm=(s==='p2'?p2name:p1name)||('Player '+(roster.length+1));setRoster(prev=>[{name:nm,isGk:m==='goalkeeper',mode:m,data,ts:Date.now()},...prev].slice(0,50));};
+  const savePlayer=(s)=>{
+    const data=s==='p2'?p2:p1;
+    const nm=((s==='p2'?p2name:p1name)||'').trim()||('Player '+(roster.length+1));
+    const entry={name:nm,isGk:m==='goalkeeper',mode:m,data,ts:Date.now()};
+    const idx=roster.findIndex(e=>e.name.toLowerCase()===nm.toLowerCase());
+    if(idx>=0){const old=roster[idx];setRoster(prev=>prev.map((e,i)=>i===idx?entry:e));showToast('Updated '+nm,()=>setRoster(prev=>prev.map((e,i)=>i===idx?old:e)));}
+    else{setRoster(prev=>[entry,...prev].slice(0,50));showToast('Saved '+nm,()=>setRoster(prev=>prev.filter(e=>e!==entry)));}
+  };
   const loadRosterInto=(entry,s)=>{if(s==='p2'){setP2({...DEF,...entry.data});setP2name(entry.name);setC(true);}else{setP1({...DEF,...entry.data});setP1name(entry.name);}if(entry.mode)setM(entry.mode);};
-  const delRoster=(i)=>setRoster(prev=>prev.filter((_,idx)=>idx!==i));
+  const delRoster=(i)=>{const removed=roster[i];setRoster(prev=>prev.filter((_,idx)=>idx!==i));showToast('Deleted '+(removed?removed.name:'player'),()=>setRoster(prev=>{const n=[...prev];n.splice(i,0,removed);return n;}));};
 
   /* OCR */
   const loadImgBlob=(blob)=>{const rd=new FileReader();rd.onload=()=>{setOcrImg(rd.result);setOcrRes(null);setOcrFound([]);setOcrProg(0);setOcrErr('');setOcrName('');};rd.readAsDataURL(blob);};
@@ -375,6 +390,12 @@ function App(){
 
   return <div className={`min-h-screen ${th.bg} ${th.txt}`}>
 
+  {toast&&<div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-3 px-4 py-2.5 rounded-lg shadow-2xl bg-gray-900 text-gray-100 border border-gray-700">
+    <span className="text-sm">{toast.msg}</span>
+    {toast.undo&&<button onClick={doUndo} className="text-sm font-bold text-amber-400 hover:text-amber-300">Undo</button>}
+    <button onClick={()=>{setToast(null);if(toastRef.current)clearTimeout(toastRef.current);}} className="text-gray-400 hover:text-gray-200 text-sm leading-none">✕</button>
+  </div>}
+
   {showSettings&&<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={()=>setShowSettings(false)}>
     <div className={`${th.card} border ${th.cb} rounded-lg shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto p-5`} onClick={e=>e.stopPropagation()}>
       <div className="flex items-center justify-between mb-4"><h2 className={`text-base font-semibold flex items-center gap-2 ${th.txt}`}><IcSettings className={`w-4 h-4 ${ACC}`}/>Settings</h2><button onClick={()=>setShowSettings(false)} className={`px-2 py-1 ${th.btn} rounded-lg`}>Close</button></div>
@@ -432,11 +453,11 @@ function App(){
         {ocrBusy&&ocrEngine==='tesseract'&&<div className="mt-3 h-1.5 bg-gray-700 rounded overflow-hidden"><div className="h-full bg-amber-500" style={{width:ocrProg+'%'}}/></div>}
         <p className={`text-[11px] ${th.txtm} mt-3 text-center`}>Reading with <b className={th.txt2}>{ocrEngine==='gemini'?'Gemini (cloud)':'Offline OCR'}</b> · <button onClick={()=>{setShowOcr(false);setShowSettings(true);}} className={`${ACC} underline`}>Change in Settings</button>{ocrEngine==='gemini'&&!gkey.trim()?<span className={NEG}> · API key required</span>:null}</p>
       </>}
-      {ocrRes&&(()=>{const expKeys=(ocrGk?Object.values(MAP_GK):Object.values(MAP_OUT)).filter((v,i,a)=>a.indexOf(v)===i).sort((a,b)=>attr[a].localeCompare(attr[b],'en'));const cur=ocrTarget==='p2'?p2:p1;return <div className="mt-2">
-        <div className="flex items-center justify-between mb-2"><h3 className={`text-sm font-semibold ${th.txt}`}>Review - read {ocrFound.length} of {expKeys.length}{ocrGk&&<span className={`text-xs ${th.txtm} ml-1`}>· Goalkeeper</span>}</h3><button onClick={()=>{setOcrRes(null);setOcrFound([]);setOcrProg(0);setOcrErr('');}} className={`text-xs px-2 py-1 ${th.btn} rounded`}>Re-read</button></div>
+      {ocrRes&&(()=>{const expKeys=(ocrGk?Object.values(MAP_GK):Object.values(MAP_OUT)).filter((v,i,a)=>a.indexOf(v)===i).sort((a,b)=>attr[a].localeCompare(attr[b],'en'));const cur=ocrTarget==='p2'?p2:p1;const warnOf=(k)=>{if(ocrFound.indexOf(k)<0)return null;const v=ocrRes[k];const w=[];if(typeof cur[k]==='number'&&Math.abs(v-cur[k])>=6)w.push('Big change from current '+cur[k]);if(v<=2||v>=19)w.push('Extreme value ('+v+')');if(ocrEngine==='tesseract'&&v<10)w.push("Single digit — check for a dropped leading '1'");return w.length?w:null;};const warnCount=expKeys.filter(k=>warnOf(k)).length;return <div className="mt-2">
+        <div className="flex items-center justify-between mb-2"><h3 className={`text-sm font-semibold ${th.txt}`}>Review - read {ocrFound.length} of {expKeys.length}{ocrGk&&<span className={`text-xs ${th.txtm} ml-1`}>· Goalkeeper</span>}{warnCount>0&&<span className="text-xs text-orange-400 ml-1">· {warnCount} to check</span>}</h3><button onClick={()=>{setOcrRes(null);setOcrFound([]);setOcrProg(0);setOcrErr('');}} className={`text-xs px-2 py-1 ${th.btn} rounded`}>Re-read</button></div>
         {ocrName&&<p className={`text-xs ${th.txtm} mb-1`}>Detected name: <span className={`font-medium ${th.txt2}`}>{ocrName}</span></p>}
-        <p className={`text-xs ${th.txtm} mb-2`}>Attributes not detected are marked <span className={`${ACC} font-medium`}>not read</span> and kept at their current value.</p>
-        <div className="grid grid-cols-2 gap-x-4 gap-y-1 max-h-64 overflow-y-auto pr-1">{expKeys.map(k=>{const found=ocrFound.indexOf(k)>=0;const val=(k in ocrRes)?ocrRes[k]:cur[k];return <div key={k} className={`flex items-center justify-between py-1 border-b ${th.bc}`}><span className={`text-xs ${th.txt2} flex items-center gap-1`}>{attr[k]}{!found&&<span className={`text-[10px] ${ACC}`}>not read</span>}</span><input type="number" min="1" max="20" value={val} onChange={e=>updOcr(k,e.target.value)} className={`w-14 px-1 py-0.5 ${th.inp} border rounded text-center text-sm ${found?'':'ring-1 ring-amber-500'}`}/></div>;})}</div>
+        <p className={`text-xs ${th.txtm} mb-2`}><span className={`${ACC} font-medium`}>not read</span> = kept at current value.{warnCount>0&&<> <span className="text-orange-400 font-medium">check</span> = possible misread, confirm it.</>}</p>
+        <div className="grid grid-cols-2 gap-x-4 gap-y-1 max-h-64 overflow-y-auto pr-1">{expKeys.map(k=>{const found=ocrFound.indexOf(k)>=0;const val=(k in ocrRes)?ocrRes[k]:cur[k];const warn=warnOf(k);return <div key={k} className={`flex items-center justify-between py-1 border-b ${th.bc}`}><span className={`text-xs ${th.txt2} flex items-center gap-1`}>{attr[k]}{!found&&<span className={`text-[10px] ${ACC}`}>not read</span>}{warn&&<span title={warn.join(' · ')} className="text-[10px] text-orange-400 cursor-help">check</span>}</span><input type="number" min="1" max="20" value={val} onChange={e=>updOcr(k,e.target.value)} className={`w-14 px-1 py-0.5 ${th.inp} border rounded text-center text-sm ${found?(warn?'ring-1 ring-orange-400':''):'ring-1 ring-amber-500'}`}/></div>;})}</div>
         <details className="mt-3"><summary className={`text-xs ${th.txtm} cursor-pointer`}>Show raw OCR text (debug)</summary><pre className={`mt-1 text-[10px] whitespace-pre-wrap max-h-40 overflow-y-auto ${th.ib} ${th.txtm} p-2 rounded`}>{ocrRaw}</pre></details>
         <div className="flex gap-2 mt-4"><button onClick={applyOcr} className={`flex-1 px-4 py-2 rounded-lg font-medium ${th.acc}`}>Apply to {c?(ocrTarget==='p2'?(p2name||'Player 2'):(p1name||'Player 1')):'Player'}</button><button onClick={closeOcr} className={`px-4 py-2 ${th.btn} rounded`}>Cancel</button></div>
       </div>;})()}
@@ -479,15 +500,19 @@ function App(){
     {showBreak&&<Breakdown rows={breakRows} th={th} compare={c}/>}
 
     {showRoster&&<div className={`${th.ib} border ${th.cb} rounded-xl p-4 sm:p-5 mb-5 shadow-sm`}>
-      <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+      <div className="flex items-center justify-between mb-3 flex-wrap gap-3">
         <h3 className={`text-sm font-bold uppercase tracking-wider ${ACC} flex items-center gap-2`}><IcUsers className="w-4 h-4"/>Saved players ({roster.length})</h3>
-        <div className="flex gap-2"><button onClick={()=>savePlayer('p1')} className={`px-3 py-1.5 rounded-lg text-sm font-medium ${th.btn}`}>Save {p1name||'Player 1'}</button>{c&&<button onClick={()=>savePlayer('p2')} className={`px-3 py-1.5 rounded-lg text-sm font-medium ${th.btn}`}>Save {p2name||'Player 2'}</button>}</div>
+        <div className="flex gap-2"><button onClick={()=>savePlayer('p1')} className={`px-3 py-1.5 rounded-lg text-sm font-medium ${th.btn}`}>{roster.some(e=>(p1name||'').trim()&&e.name.toLowerCase()===(p1name||'').trim().toLowerCase())?'Update':'Save'} {p1name||'Player 1'}</button>{c&&<button onClick={()=>savePlayer('p2')} className={`px-3 py-1.5 rounded-lg text-sm font-medium ${th.btn}`}>{roster.some(e=>(p2name||'').trim()&&e.name.toLowerCase()===(p2name||'').trim().toLowerCase())?'Update':'Save'} {p2name||'Player 2'}</button>}</div>
       </div>
-      {roster.length===0?<p className={`text-sm ${th.txtm}`}>No saved players yet.</p>:
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 max-h-80 overflow-y-auto pr-2">{roster.map((e,i)=><div key={i} className={`${th.card} border ${th.bc} rounded-lg p-3 flex items-center justify-between gap-3 shadow-sm`}>
-        <div className="min-w-0"><div className={`text-base font-bold truncate ${th.txt}`}>{e.name}</div><div className={`text-xs font-medium mt-0.5 ${th.txtm}`}>{e.isGk?'GK':e.mode==='offensive'?'Off':e.mode==='defensive'?'Def':'All'}</div></div>
-        <div className="flex items-center gap-1.5 shrink-0"><button onClick={()=>loadRosterInto(e,'p1')} title="Load into Player 1" className={`px-2 py-1 rounded-md text-xs font-bold ${th.btn}`}>P1</button><button onClick={()=>loadRosterInto(e,'p2')} title="Load into Player 2" className={`px-2 py-1 rounded-md text-xs font-bold ${th.btn}`}>P2</button><button onClick={()=>delRoster(i)} title="Delete" className={`p-1.5 rounded-md ${th.btn}`}><IcTrash className="w-4 h-4"/></button></div>
-      </div>)}</div>}
+      {roster.length>3&&<input value={rosterQ} onChange={e=>setRosterQ(e.target.value)} placeholder="Search players…" className={`w-full mb-3 px-3 py-1.5 ${th.inp} border rounded-lg text-sm`}/>}
+      {roster.length===0?<p className={`text-sm ${th.txtm}`}>No saved players yet.</p>:(()=>{
+        const rv=roster.map((e,i)=>({e,i})).filter(({e})=>e.name.toLowerCase().includes(rosterQ.trim().toLowerCase()));
+        if(rv.length===0)return <p className={`text-sm ${th.txtm}`}>No players match “{rosterQ}”.</p>;
+        return <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 max-h-80 overflow-y-auto pr-2">{rv.map(({e,i})=>{const md=e.isGk?['GK','text-rose-400']:e.mode==='offensive'?['Off','text-emerald-400']:e.mode==='defensive'?['Def','text-sky-400']:['All','text-gray-400'];return <div key={i} className={`${th.card} border ${th.bc} rounded-lg p-3 flex items-center justify-between gap-3 shadow-sm`}>
+          <div className="min-w-0"><div className={`text-base font-bold truncate ${th.txt}`}>{e.name}</div><div className="mt-0.5"><span className={`text-[10px] font-bold uppercase tracking-wide ${md[1]}`}>{md[0]}</span></div></div>
+          <div className="flex items-center gap-1.5 shrink-0"><button onClick={()=>loadRosterInto(e,'p1')} title="Load into Player 1" className={`px-2 py-1 rounded-md text-xs font-bold ${th.btn}`}>P1</button><button onClick={()=>loadRosterInto(e,'p2')} title="Load into Player 2" className={`px-2 py-1 rounded-md text-xs font-bold ${th.btn}`}>P2</button><button onClick={()=>delRoster(i)} title="Delete" className={`p-1.5 rounded-md ${th.btn}`}><IcTrash className="w-4 h-4"/></button></div>
+        </div>;})}</div>;
+      })()}
     </div>}
 
     {showHs&&<div className={`${th.ib} border ${th.cb} rounded-xl p-4 sm:p-5 mb-5 shadow-sm`}>

@@ -77,10 +77,31 @@ When you stop mid-task, set it to `[~]` and add an indented note so the next ses
 - [x] Comparison Focus Rework: Extract metrics into a large Hero Scoreboard, redesign `AttrRowCompare`
   to a center-aligned Tug-of-war layout, simplify the sticky header, and improve typography/spacing.
 
+### Quality-of-life (no new tab-bar buttons)
+
+- [x] Improve screenshot review confidence: soft `check` warnings for suspicious reads (big change vs
+  current, extreme value, tesseract single-digit) — advisory only, no blocking.
+- [x] Roster search + update-existing (Save button becomes Update on name match) + mode badges.
+- [x] Undo toast (no confirm modals) for reset-all, delete history snapshot, delete saved player.
+- [x] Persist user preferences (`fm_prefs`): theme, last mode, compare, only-differences, open panels.
+
 ### Docs
 
 - [ ] Fill `docs/impact-model.md` with the exact scoring formula, the mode subsets, and the weight source.
 
+- 2026-07-08: Quality-of-life pass on `src/index.html` (no new tab-bar buttons, per request).
+  (1) **Screenshot review confidence**: added `warnOf(k)` in the review render — each read value can be
+  flagged `check` (orange text + orange input ring, `title` lists reasons) with a `· N to check` header
+  count. Heuristics: read differs from current by ≥6, extreme value (≤2 or ≥19), and tesseract-only
+  single-digit (<10, common dropped-leading-1 misread). Advisory only; never blocks Apply.
+  (2) **Roster search + update**: search box (shown once >3 saved), per-player mode badge (GK/Off/Def/All,
+  colour-coded), and `savePlayer` now updates an existing entry when the name matches (button reads
+  **Update** vs **Save**) instead of always creating a duplicate. (3) **Undo toasts**: `resetAll`,
+  `deleteOne` (history), `delRoster`, and save now pop a bottom-centre toast with **Undo** (restores prior
+  state; deletes re-insert at original index) via `showToast`/`doUndo` + `toastRef`; replaces confirm
+  modals. (4) **Persisted prefs** (`fm_prefs`): theme, last mode, compare, only-differences, and which
+  panels were open are read on load (lazy `useState`) and saved by an effect; theme defaults to dark when
+  unset. Docs updated (ui.md, screenshot-autofill.md). Verified served (HTTP 200).
 - 2026-07-07: Implemented the "UI Rework and Comparison Focus" plan. Extracted metrics and name inputs
   from the sticky header into a new, prominent `metricSingle` / `metricCompare` Hero Scoreboard component.
   Redesigned `AttrRowCompare` to use a center-aligned Tug-of-war layout (P1 value left, attribute name

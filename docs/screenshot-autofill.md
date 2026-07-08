@@ -64,6 +64,12 @@ and a "Change in Settings" link):
   `MAP_GK` targets), not just matches. Anything not detected is flagged `not read` (amber ring) and
   pre-filled with the target player's current value, so a missed read is visible and editable rather
   than silently left at the default. `ocrFound` holds the keys actually read from the image.
+- **Soft confidence warnings.** Beyond `not read`, each *read* value is checked by `warnOf(k)` (local
+  to the review render) for likely misreads and, if any, marked `check` (orange text + orange input
+  ring, `title` lists the reasons); the header shows a `· N to check` count. Heuristics: (a) the read
+  differs from the player's current value by ≥6, (b) an extreme value (≤2 or ≥19), and (c) tesseract
+  only — a single-digit read (<10), since Tesseract often drops a leading "1" (16→6). These are
+  advisory only; they never block Apply or change the value, they just draw the eye to the risky rows.
 - OCR state: `showOcr`, `ocrTarget`, `ocrImg`, `ocrBusy`, `ocrProg`, `ocrRes`, `ocrGk`, `ocrErr`,
   `ocrFound`, `ocrRaw`, `ocrName` (detected name), `dragging` (drop-zone highlight), `ocrEngine`,
   `gkey`.

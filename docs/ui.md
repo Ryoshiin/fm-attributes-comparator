@@ -50,7 +50,9 @@ is unchanged from the original.
 4. **Mode tabs** - All / Offensive / Defensive / Goalkeeper + active-attribute count; the **Only
    differences** filter (`onlyDiff`) sits at the right of this row (compare only).
 5. **Breakdown** panel (toggle) - per-attribute Points contribution bars; compare shows the P1−P2 delta.
-6. **Saved players** panel (toggle) - roster in `localStorage`; save slot, load into P1/P2, delete.
+6. **Saved players** panel (toggle) - roster in `localStorage`. Save/Update slot (the button reads
+   **Update** when a saved player already matches the current name, else **Save**), search box (shown once
+   >3 players), per-player mode badge (GK/Off/Def/All, colour-coded), load into P1/P2, delete.
 7. **History** panel (toggle) - saved snapshots (load/delete) with player names.
 8. **Attribute grid** - `Cat` cards in a **stable balanced masonry**: `ncol` is derived from a tracked
    `vw` (window width) at the same breakpoints (single: 3 @≥1024, 2 @≥640, else 1; compare: 2 @≥1280,
@@ -75,6 +77,18 @@ also removed earlier; the centre Δ block + Breakdown panel cover that need.
 - `fm_gemini_key` - the user's Gemini API key (bring-your-own).
 - `fm_ocr_engine` - last chosen OCR engine (`gemini` | `tesseract`).
 - `fm_seen_tip` - `'1'` once the onboarding tip is dismissed.
+- `fm_prefs` - persisted UI preferences `{dm, m, c, onlyDiff, showBreak, showRoster, showHs}`
+  (theme, last mode, compare on/off, only-differences filter, and which panels were open). Read once
+  via a lazy `useState` for initial values, then written by an effect on any change. Theme defaults to
+  dark when unset (`dm !== false`).
+
+## Undo toast
+
+Destructive actions (reset-all in Settings, delete a history snapshot, delete a saved player) do **not**
+use confirm modals. Instead they run immediately and pop a lightweight bottom-centre toast
+(`{msg, undo}`, `z-[60]`, auto-dismiss after 6s) with an **Undo** button that restores the prior state
+(deletes re-insert at the original index; reset-all restores the full P1/P2 snapshot). Saving a player
+also toasts (Undo removes/reverts the entry). Managed by `showToast`/`doUndo` + a `toastRef` timer.
 
 ## Theme
 
