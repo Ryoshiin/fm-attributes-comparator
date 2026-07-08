@@ -1,0 +1,29 @@
+# Private / local-only: logs, secrets, scratch. Never committed.
+# Ignore everything under local/, but keep the empty folder tracked (via .gitkeep) so a fresh
+# clone still has it. Create logs/, secrets/, etc. on demand; they stay ignored.
+local/**
+!local/
+!local/.gitkeep
+
+# Dependencies & build output
+node_modules/
+dist/
+build/
+out/
+coverage/
+.cache/
+
+# Environment & secrets
+.env
+.env.local
+.env.*
+*.key
+*.pem
+
+# Editor / OS
+.vscode/
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
