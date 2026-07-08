@@ -88,6 +88,15 @@ When you stop mid-task, set it to `[~]` and add an indented note so the next ses
   and action buttons. Increased typography sizes (e.g., `text-[10px]` -> `text-xs`, `text-xs` -> `text-sm`)
   and padding across all components (`Cat`, `Breakdown`, panels) for a cleaner, less cramped look.
   Adjusted the `Cat` grid layout to `xl:columns-2` in compare mode to accommodate the wider rows.
+- 2026-07-08: Published the project. Created the GitHub repo `Ryoshiin/fm-attributes-comparator`
+  (initial commit), then set it **public** and added GitHub Pages hosting via a GitHub Actions workflow
+  (`.github/workflows/deploy-pages.yml`) that uploads `src/` as the Pages artifact (app root, since
+  `index.html` lives in `src/`). Pages `build_type=workflow` had to be enabled once via the API by the
+  repo owner because the Actions `GITHUB_TOKEN` can't create the Pages site ("Resource not accessible by
+  integration"); after that the deploy succeeds and every push to `master` auto-publishes. Live at
+  https://ryoshiin.github.io/fm-attributes-comparator/ (verified HTTP 200). Public hosting is safe: no
+  server secrets; the Gemini key is user-entered and stored only in the browser. Updated README (live
+  URL, corrected shipped-vs-planned features, deploy note).
 - 2026-07-07: Layout consistency tweaks on `src/index.html`. **Removed the big bottom gap** in All mode
   (short Hidden column sitting far below Physical): replaced the row-major CSS grid with a JS-balanced
   flex masonry — `ncol` from a tracked `vw` at the same breakpoints, then categories greedily packed into

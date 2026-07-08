@@ -3,6 +3,8 @@
 A browser tool for Football Manager. It turns a player's attributes into a projected match impact
 and lets you compare two players side by side.
 
+**Live:** https://ryoshiin.github.io/fm-attributes-comparator/
+
 For each player it computes three numbers from the attribute values:
 
 - **Points** - overall projected impact on results.
@@ -17,29 +19,31 @@ The scoring uses empirical attribute weights from
 
 - Enter attributes (1-20) and see projected Points / GF / GA live.
 - Modes: All, Offensive, Defensive, Goalkeeper - each scores a relevant subset of attributes.
-- Compare two players and see the delta.
-- Save comparisons to a local history (stored in the browser via `localStorage`).
-- Attribute tier list and an in-app help panel.
-
-### Planned
-
-- **Screenshot autofill** - upload an FM player profile screenshot; in-browser OCR (Tesseract.js)
-  reads the attribute values and fills the inputs automatically. See
+- Compare two players with a Δ scoreboard and a per-attribute breakdown.
+- **Screenshot autofill** - upload/paste/drag an FM player profile screenshot and auto-fill the
+  attributes, via Gemini (cloud, bring-your-own free key) or Tesseract (offline). See
   [`docs/screenshot-autofill.md`](docs/screenshot-autofill.md).
-- Migrate the remaining French UI text to English.
+- Save players (roster) and comparison history in the browser (`localStorage`).
+- Attribute tier list and in-app help (in the Settings panel).
 
 ## Run it
 
 No build step. Either:
 
+- Use the hosted version: https://ryoshiin.github.io/fm-attributes-comparator/, or
 - Open `src/index.html` directly in a browser, or
-- Serve it (needed later so the browser can load screenshot files reliably):
+- Serve it locally (so the browser can load screenshot files reliably):
 
 ```bash
 cd src
 python -m http.server 8000
 # then open http://localhost:8000
 ```
+
+## Deploy
+
+Pushing to `master` auto-publishes `src/` to GitHub Pages via
+[`.github/workflows/deploy-pages.yml`](.github/workflows/deploy-pages.yml).
 
 ## How it works
 
